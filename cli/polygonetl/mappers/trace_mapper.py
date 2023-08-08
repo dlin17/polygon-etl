@@ -49,10 +49,10 @@ class EthTraceMapper(object):
             result = {}
 
         trace_type = json_dict.get('type')
-        trace.trace_type = trace_type
+        trace.trace_type = trace_type.lower()
 
         # common fields in call/create
-        if trace_type in ('call', 'create'):
+        if trace_type in ('call', 'create', 'create2'):
             trace.from_address = to_normalized_address(action.get('from'))
             trace.value = hex_to_dec(action.get('value'))
             trace.gas = hex_to_dec(action.get('gas'))
@@ -64,7 +64,7 @@ class EthTraceMapper(object):
             trace.to_address = to_normalized_address(action.get('to'))
             trace.input = action.get('input')
             trace.output = result.get('output')
-        elif trace_type == 'create':
+        elif trace_type in ('create','create2'):
             trace.to_address = result.get('address')
             trace.input = action.get('init')
             trace.output = result.get('code')
