@@ -33,10 +33,13 @@ class EthContractService:
             evm_code.disassemble(bytecode)
             basic_blocks = evm_code.basicblocks
             if basic_blocks and len(basic_blocks) > 0:
-                init_block = basic_blocks[0]
-                instructions = init_block.instructions
-                push4_instructions = [inst for inst in instructions if inst.name == 'PUSH4']
-                return sorted(list(set('0x' + inst.operand for inst in push4_instructions)))
+                push4_instructions = set()
+                for block in basic_blocks:
+                    instructions = block.instructions
+                    block_push4_instructions = [inst for inst in instructions if inst.name == 'PUSH4']
+                    push4_instructions.update(block_push4_instructions)
+
+                return sorted(list({'0x' + inst.operand for inst in push4_instructions}))
             else:
                 return []
         else:
@@ -46,29 +49,32 @@ class EthContractService:
     # https://github.com/OpenZeppelin/openzeppelin-solidity/blob/master/contracts/token/ERC20/ERC20.sol
     def is_erc20_contract(self, function_sighashes):
         c = ContractWrapper(function_sighashes)
-        return c.implements('totalSupply()') and \
-               c.implements('balanceOf(address)') and \
-               c.implements('transfer(address,uint256)') and \
-               c.implements('transferFrom(address,address,uint256)') and \
-               c.implements('approve(address,uint256)') and \
-               c.implements('allowance(address,address)')
+        return all([
+            c.implements('totalSupply()'),
+            c.implements('balanceOf(address)'),
+            c.implements('transfer(address,uint256)'),
+            c.implements('transferFrom(address,address,uint256)'),
+            c.implements('approve(address,uint256)'),
+            c.implements('allowance(address,address)')
+        ])
 
     # https://github.com/ethereum/EIPs/blob/master/EIPS/eip-721.md
     # https://github.com/OpenZeppelin/openzeppelin-solidity/blob/master/contracts/token/ERC721/ERC721Basic.sol
-    # Doesn't check the below ERC721 methods to match CryptoKitties contract
-    # getApproved(uint256)
-    # setApprovalForAll(address,bool)
-    # isApprovedForAll(address,address)
-    # transferFrom(address,address,uint256)
-    # safeTransferFrom(address,address,uint256)
-    # safeTransferFrom(address,address,uint256,bytes)
+    # so we have to check for it's sighashes explicitly
     def is_erc721_contract(self, function_sighashes):
         c = ContractWrapper(function_sighashes)
-        return c.implements('balanceOf(address)') and \
-               c.implements('ownerOf(uint256)') and \
-               c.implements_any_of('transfer(address,uint256)', 'transferFrom(address,address,uint256)') and \
-               c.implements('approve(address,uint256)')
-
+        return all([
+            c.implements('balanceOf(address)'),
+            c.implements('ownerOf(uint256)'),
+            c.implements_any_of('transfer(address,uint256)', 'transferFrom(address,address,uint256)'),
+            c.implements('approve(address,uint256)'),
+            c.implements('getApproved(uint256)'),
+            c.implements('setApprovalForAll(address,bool)'),
+            c.implements('isApprovedForAll(address,address)'),
+            c.implements('transferFrom(address,address,uint256)'),
+            c.implements('safeTransferFrom(address,address,uint256)'),
+            c.implements('safeTransferFrom(address,address,uint256,bytes)'),
+        ])
 
 def clean_bytecode(bytecode):
     if bytecode is None or bytecode == '0x':
